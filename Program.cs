@@ -90,7 +90,7 @@ builder.Services.AddScoped<IAdminUserPasswordService, AdminUserPasswordService>(
 builder.Services.AddScoped<IAdminRoleService, AdminRoleService>();
 builder.Services.AddScoped<IPortalAccessService, PortalAccessService>();
 builder.Services.AddScoped<IPasswordUpdateService, PasswordUpdateService>();
-//builder.Services.AddScoped<IPortalEmailService, GraphEmailService>();
+builder.Services.AddScoped<IPortalEmailService, GraphEmailService>();
 
 // usage tracking / logging services
 

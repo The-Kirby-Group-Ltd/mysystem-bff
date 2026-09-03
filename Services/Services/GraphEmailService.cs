@@ -6,8 +6,7 @@ using mysystem_bff.Services.Interfaces;
 
 namespace mysystem_bff.Services.Services
 {
-    public class GraphEmailService :
-        IGraphEmailService
+    public class GraphEmailService : IPortalEmailService
     {
         private readonly GraphServiceClient _graphClient;
         private readonly string _senderUser;
