@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Data;
 using Dapper;
 using MySqlConnector;
 using mysystem_bff.Models.Admin;
@@ -154,6 +155,8 @@ namespace mysystem_bff.Services.Services
             // =================================================
             // Store challenge
             // =================================================
+
+            await EnsureConnectionOpenAsync(ct);
 
             await using var transaction =
                 await _db.BeginTransactionAsync(ct);
@@ -496,6 +499,8 @@ namespace mysystem_bff.Services.Services
                 BCrypt.Net.BCrypt.HashPassword(
                     newPassword);
 
+            await EnsureConnectionOpenAsync(ct);
+
             await using var transaction =
                 await _db.BeginTransactionAsync(ct);
 
@@ -674,6 +679,19 @@ namespace mysystem_bff.Services.Services
             public DateTime ExpiresAtUtc { get; set; }
 
             public int AttemptsRemaining { get; set; }
+        }
+
+        // =====================================================
+        // Database connection helper
+        // =====================================================
+
+        private async Task EnsureConnectionOpenAsync(
+            CancellationToken ct)
+        {
+            if (_db.State != ConnectionState.Open)
+            {
+                await _db.OpenAsync(ct);
+            }
         }
     }
 }
