@@ -18,12 +18,39 @@ public class AdminUserCreateService : IAdminUserCreateService
         _readService = readService;
     }
 
-    public async Task<ServiceResult<UserListItemDto>> CreateUser(CreateUserRequest request)
+    public async Task<ServiceResult<UserListItemDto>> CreateUser(
+        CreateUserRequest request,
+        string actingUserId,
+        IReadOnlyCollection<string> actingRoles)
     {
-        var validationError = ValidateCreateUserRequest(request);
+        if (string.IsNullOrWhiteSpace(actingUserId))
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                "Unable to resolve the current user.",
+                401);
+        }
+
+        var validationError =
+            ValidateCreateUserRequest(request);
 
         if (validationError is not null)
-            return ServiceResult<UserListItemDto>.Fail(validationError, 400);
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                validationError,
+                400);
+        }
+
+        var permissionError =
+            ValidateCreatePermission(
+                actingRoles,
+                request.Role);
+
+        if (permissionError is not null)
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                permissionError,
+                403);
+        }
 
         var roleId = await _db.QuerySingleOrDefaultAsync<int?>(
             """
@@ -230,6 +257,53 @@ public class AdminUserCreateService : IAdminUserCreateService
 
         if (string.IsNullOrWhiteSpace(request.Role))
             return "Role is required.";
+
+        return null;
+    }
+
+    private static string? ValidateCreatePermission(
+        IReadOnlyCollection<string> actingRoles,
+        string requestedRole)
+    {
+        var isAdministrator =
+            actingRoles.Contains(
+                "Administrator",
+                StringComparer.OrdinalIgnoreCase);
+
+        var isStaff =
+            actingRoles.Contains(
+                "Staff",
+                StringComparer.OrdinalIgnoreCase);
+
+        if (isAdministrator)
+        {
+            return null;
+        }
+
+        if (!isStaff)
+        {
+            return
+                "You do not have permission to create portal users.";
+        }
+
+        var staffAllowedRoles =
+            new[]
+            {
+                "Engineer",
+                "CustomerUser",
+                "SiteUser"
+            };
+
+        var roleAllowed =
+            staffAllowedRoles.Contains(
+                requestedRole,
+                StringComparer.OrdinalIgnoreCase);
+
+        if (!roleAllowed)
+        {
+            return
+                "Staff users can only create Engineer, Customer User or Site User accounts.";
+        }
 
         return null;
     }

@@ -54,15 +54,40 @@ public class AdminUsersController : ControllerBase
 
     // create new user
     [HttpPost]
-    [Authorize(Policy = "AdministratorOnly")]
-    public async Task<ActionResult<UserListItemDto>> CreateUser(CreateUserRequest request)
+    public async Task<ActionResult<UserListItemDto>> CreateUser(
+        CreateUserRequest request)
     {
-        var result = await _createService.CreateUser(request);
+        var actingUserId =
+            User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(actingUserId))
+        {
+            return Unauthorized(
+                "Unable to resolve the current user.");
+        }
+
+        var actingRoles =
+            User.FindAll(ClaimTypes.Role)
+                .Select(role => role.Value)
+                .ToList();
+
+        var result =
+            await _createService.CreateUser(
+                request,
+                actingUserId,
+                actingRoles);
 
         if (!result.Success)
-            return StatusCode(result.StatusCode, result.Error);
+        {
+            return StatusCode(
+                result.StatusCode,
+                result.Error);
+        }
 
-        return StatusCode(result.StatusCode, result.Data);
+        return StatusCode(
+            result.StatusCode,
+            result.Data);
     }
 
     // update specific user attribute(s)
