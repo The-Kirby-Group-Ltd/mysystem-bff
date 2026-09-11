@@ -1,13 +1,15 @@
 ﻿namespace mysystem_bff.Controllers;
 
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using mysystem_bff.Models.Admin;
 using mysystem_bff.Services.Interfaces;
 
 [ApiController]
 [Route("api/admin/users")]
-[Authorize(Policy = "AdministratorOnly")]
+[Authorize(Policy = "AdministrationAccess")]
 public class AdminUsersController : ControllerBase
 {
     private readonly IAdminUserReadService _readService;
@@ -52,6 +54,7 @@ public class AdminUsersController : ControllerBase
 
     // create new user
     [HttpPost]
+    [Authorize(Policy = "AdministratorOnly")]
     public async Task<ActionResult<UserListItemDto>> CreateUser(CreateUserRequest request)
     {
         var result = await _createService.CreateUser(request);
@@ -68,7 +71,21 @@ public class AdminUsersController : ControllerBase
         string userId,
         UpdateUserRequest request)
     {
-        var result = await _updateService.UpdateUser(userId, request);
+        var actingUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(actingUserId))
+            return Unauthorized("Unable to resolve the current user");
+
+        var actingRoles = 
+            User.FindAll(ClaimTypes.Role)
+                .Select(role => role.Value)
+                .ToList();
+        
+        var result = await _updateService.UpdateUser(
+            userId,
+            request,
+            actingUserId,
+            actingRoles);
 
         if (!result.Success)
             return StatusCode(result.StatusCode, result.Error);

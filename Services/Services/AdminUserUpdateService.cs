@@ -18,74 +18,158 @@ public class AdminUserUpdateService : IAdminUserUpdateService
         _readService = readService;
     }
 
+    // =========================================================
+    // Update user
+    // =========================================================
+
     public async Task<ServiceResult<UserListItemDto>> UpdateUser(
         string userId,
-        UpdateUserRequest request)
+        UpdateUserRequest request,
+        string actingUserId,
+        IReadOnlyCollection<string> actingRoles)
     {
         if (string.IsNullOrWhiteSpace(userId))
-            return ServiceResult<UserListItemDto>.Fail("User ID is required.", 400);
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                "User ID is required.",
+                400);
+        }
 
-        var validationError = ValidateUpdateUserRequest(request);
+        if (string.IsNullOrWhiteSpace(actingUserId))
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                "Unable to resolve the current user.",
+                401);
+        }
+
+        var validationError =
+            ValidateUpdateUserRequest(request);
 
         if (validationError is not null)
-            return ServiceResult<UserListItemDto>.Fail(validationError, 400);
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                validationError,
+                400);
+        }
 
-        var userExists = await _db.QuerySingleOrDefaultAsync<string>(
-            """
-            SELECT CAST(user_id AS CHAR)
-            FROM users
-            WHERE CAST(user_id AS CHAR) = @UserId
-            LIMIT 1;
-            """,
-            new { UserId = userId }
-        );
+        // =====================================================
+        // Resolve target user and current role
+        // =====================================================
 
-        if (userExists is null)
-            return ServiceResult<UserListItemDto>.Fail("User not found.", 404);
+        var targetUser =
+            await _db.QuerySingleOrDefaultAsync<TargetUserRow>(
+                """
+                SELECT
+                    CAST(u.user_id AS CHAR) AS UserId,
+                    r.role_name AS Role
+                FROM users u
+                LEFT JOIN user_roles ur
+                    ON ur.user_id = u.user_id
+                LEFT JOIN roles r
+                    ON r.role_id = ur.role_id
+                WHERE CAST(u.user_id AS CHAR) = @UserId
+                LIMIT 1;
+                """,
+                new
+                {
+                    UserId = userId
+                });
 
-        var duplicateUser = await _db.QuerySingleOrDefaultAsync<string>(
-            """
-            SELECT CAST(user_id AS CHAR)
-            FROM users
-            WHERE 
-                (username = @Username OR email = @Email)
-                AND CAST(user_id AS CHAR) <> @UserId
-            LIMIT 1;
-            """,
-            new
-            {
-                UserId = userId,
-                request.Username,
-                request.Email
-            }
-        );
+        if (targetUser is null)
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                "User not found.",
+                404);
+        }
+
+        // =====================================================
+        // Permission checks
+        // =====================================================
+
+        var permissionError =
+            ValidateUpdatePermission(
+                actingUserId,
+                actingRoles,
+                targetUser,
+                request.Role);
+
+        if (permissionError is not null)
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                permissionError,
+                403);
+        }
+
+        // =====================================================
+        // Duplicate username / email check
+        // =====================================================
+
+        var duplicateUser =
+            await _db.QuerySingleOrDefaultAsync<string>(
+                """
+                SELECT CAST(user_id AS CHAR)
+                FROM users
+                WHERE
+                    (username = @Username OR email = @Email)
+                    AND CAST(user_id AS CHAR) <> @UserId
+                LIMIT 1;
+                """,
+                new
+                {
+                    UserId = userId,
+                    request.Username,
+                    request.Email
+                });
 
         if (duplicateUser is not null)
         {
             return ServiceResult<UserListItemDto>.Fail(
                 "Another user already has this username or email.",
-                409
-            );
+                409);
         }
 
-        var roleId = await _db.QuerySingleOrDefaultAsync<int?>(
-            """
-            SELECT role_id
-            FROM roles
-            WHERE role_name = @Role
-            LIMIT 1;
-            """,
-            new { request.Role }
-        );
+        // =====================================================
+        // Resolve requested role
+        // =====================================================
+
+        var roleId =
+            await _db.QuerySingleOrDefaultAsync<int?>(
+                """
+                SELECT role_id
+                FROM roles
+                WHERE role_name = @Role
+                LIMIT 1;
+                """,
+                new
+                {
+                    request.Role
+                });
 
         if (roleId is null)
-            return ServiceResult<UserListItemDto>.Fail("Invalid role.", 400);
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                "Invalid role.",
+                400);
+        }
 
-        await _db.OpenAsync();
-        await using var transaction = await _db.BeginTransactionAsync();
+        // =====================================================
+        // Begin update transaction
+        // =====================================================
+
+        if (_db.State != System.Data.ConnectionState.Open)
+        {
+            await _db.OpenAsync();
+        }
+
+        await using var transaction =
+            await _db.BeginTransactionAsync();
 
         try
         {
+            // =================================================
+            // Update core user details
+            // =================================================
+
             await _db.ExecuteAsync(
                 """
                 UPDATE users
@@ -107,17 +191,22 @@ public class AdminUserUpdateService : IAdminUserUpdateService
                     request.LastName,
                     request.Telephone
                 },
-                transaction
-            );
+                transaction);
+
+            // =================================================
+            // Update role
+            // =================================================
 
             await _db.ExecuteAsync(
                 """
                 DELETE FROM user_roles
                 WHERE CAST(user_id AS CHAR) = @UserId;
                 """,
-                new { UserId = userId },
-                transaction
-            );
+                new
+                {
+                    UserId = userId
+                },
+                transaction);
 
             await _db.ExecuteAsync(
                 """
@@ -135,17 +224,22 @@ public class AdminUserUpdateService : IAdminUserUpdateService
                     UserId = userId,
                     RoleId = roleId.Value
                 },
-                transaction
-            );
+                transaction);
+
+            // =================================================
+            // Update staff profile
+            // =================================================
 
             await _db.ExecuteAsync(
                 """
                 DELETE FROM staff_profiles
                 WHERE CAST(user_id AS CHAR) = @UserId;
                 """,
-                new { UserId = userId },
-                transaction
-            );
+                new
+                {
+                    UserId = userId
+                },
+                transaction);
 
             if (!string.IsNullOrWhiteSpace(request.Position))
             {
@@ -165,23 +259,32 @@ public class AdminUserUpdateService : IAdminUserUpdateService
                         UserId = userId,
                         request.Position
                     },
-                    transaction
-                );
+                    transaction);
             }
+
+            // =================================================
+            // Update customer access
+            // =================================================
 
             await _db.ExecuteAsync(
                 """
                 DELETE FROM user_customer_access
                 WHERE CAST(user_id AS CHAR) = @UserId;
                 """,
-                new { UserId = userId },
-                transaction
-            );
+                new
+                {
+                    UserId = userId
+                },
+                transaction);
 
-            foreach (var customerNo in request.CustomerNos
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct())
+            foreach (
+                var customerNo in request.CustomerNos
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x))
+                    .Select(x =>
+                        x.Trim().ToUpperInvariant())
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase))
             {
                 await _db.ExecuteAsync(
                     """
@@ -199,23 +302,32 @@ public class AdminUserUpdateService : IAdminUserUpdateService
                         UserId = userId,
                         CustomerNo = customerNo
                     },
-                    transaction
-                );
+                    transaction);
             }
+
+            // =================================================
+            // Update site access
+            // =================================================
 
             await _db.ExecuteAsync(
                 """
                 DELETE FROM user_site_access
                 WHERE CAST(user_id AS CHAR) = @UserId;
                 """,
-                new { UserId = userId },
-                transaction
-            );
+                new
+                {
+                    UserId = userId
+                },
+                transaction);
 
-            foreach (var siteId in request.SiteIds
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct())
+            foreach (
+                var siteId in request.SiteIds
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x))
+                    .Select(x =>
+                        x.Trim().ToUpperInvariant())
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase))
             {
                 await _db.ExecuteAsync(
                     """
@@ -233,8 +345,7 @@ public class AdminUserUpdateService : IAdminUserUpdateService
                         UserId = userId,
                         SiteId = siteId
                     },
-                    transaction
-                );
+                    transaction);
             }
 
             await transaction.CommitAsync();
@@ -245,31 +356,141 @@ public class AdminUserUpdateService : IAdminUserUpdateService
             throw;
         }
 
-        var updatedUser = await _readService.GetUserById(userId);
+        // =====================================================
+        // Reload updated user
+        // =====================================================
+
+        var updatedUser =
+            await _readService.GetUserById(
+                userId);
 
         if (updatedUser is null)
-            return ServiceResult<UserListItemDto>.Fail("User was updated but could not be loaded.", 500);
+        {
+            return ServiceResult<UserListItemDto>.Fail(
+                "User was updated but could not be loaded.",
+                500);
+        }
 
-        return ServiceResult<UserListItemDto>.Ok(updatedUser);
+        return ServiceResult<UserListItemDto>.Ok(
+            updatedUser);
     }
 
-    private static string? ValidateUpdateUserRequest(UpdateUserRequest request)
+    // =========================================================
+    // Request validation
+    // =========================================================
+
+    private static string? ValidateUpdateUserRequest(
+        UpdateUserRequest request)
     {
+        if (request is null)
+        {
+            return "Update request is required.";
+        }
+
         if (string.IsNullOrWhiteSpace(request.Username))
+        {
             return "Username is required.";
+        }
 
         if (string.IsNullOrWhiteSpace(request.Email))
+        {
             return "Email is required.";
+        }
 
         if (string.IsNullOrWhiteSpace(request.FirstName))
+        {
             return "First name is required.";
+        }
 
         if (string.IsNullOrWhiteSpace(request.LastName))
+        {
             return "Last name is required.";
+        }
 
         if (string.IsNullOrWhiteSpace(request.Role))
+        {
             return "Role is required.";
+        }
 
         return null;
+    }
+
+    // =========================================================
+    // Administration permission validation
+    // =========================================================
+
+    private static string? ValidateUpdatePermission(
+        string actingUserId,
+        IReadOnlyCollection<string> actingRoles,
+        TargetUserRow targetUser,
+        string requestedRole)
+    {
+        var isAdministrator =
+            actingRoles.Contains(
+                "Administrator",
+                StringComparer.OrdinalIgnoreCase);
+
+        var isStaff =
+            actingRoles.Contains(
+                "Staff",
+                StringComparer.OrdinalIgnoreCase);
+
+        // Administrators may update any user.
+        if (isAdministrator)
+        {
+            return null;
+        }
+
+        // Only Staff or Administrator should reach this service.
+        if (!isStaff)
+        {
+            return
+                "You do not have permission to update portal users.";
+        }
+
+        // Staff cannot modify Administrator or Staff accounts.
+        if (IsPrivilegedRole(targetUser.Role))
+        {
+            return
+                "Staff users cannot modify Administrator or Staff accounts.";
+        }
+
+        // Staff cannot promote another user to Staff or Administrator.
+        if (IsPrivilegedRole(requestedRole))
+        {
+            return
+                "Staff users cannot assign the Administrator or Staff role.";
+        }
+
+        return null;
+    }
+
+    // =========================================================
+    // Role helpers
+    // =========================================================
+
+    private static bool IsPrivilegedRole(
+        string? role)
+    {
+        return
+            string.Equals(
+                role,
+                "Administrator",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                role,
+                "Staff",
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    // =========================================================
+    // Internal database rows
+    // =========================================================
+
+    private class TargetUserRow
+    {
+        public string UserId { get; set; } = "";
+
+        public string Role { get; set; } = "";
     }
 }

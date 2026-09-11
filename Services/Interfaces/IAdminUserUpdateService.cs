@@ -4,5 +4,9 @@ namespace mysystem_bff.Services.Interfaces;
 
 public interface IAdminUserUpdateService
 {
-    Task<ServiceResult<UserListItemDto>> UpdateUser(string userId, UpdateUserRequest request);
+    Task<ServiceResult<UserListItemDto>> UpdateUser(
+        string userId, 
+        UpdateUserRequest request,
+        string actingUserId,
+        IReadOnlyCollection<string> actingRoles);
 }
