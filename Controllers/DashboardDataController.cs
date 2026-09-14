@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using mysystem_bff.Models.Portal.DashboardData;
 using mysystem_bff.Services.Interfaces;
+using mysystem_bff.Services.Services;
 
 namespace mysystem_bff.Controllers;
 
@@ -219,6 +220,104 @@ public class DashboardDataController : ControllerBase
 
         return Ok(
             result.Data);
+    }
+
+    // =========================================================
+    // SLA dashboard summary
+    // =========================================================
+
+    [HttpGet("sla-dashboard")]
+    public async Task<ActionResult<PortalSlaDashboardDataDto>>
+        GetSlaDashboardData(
+            [FromQuery] PortalDashboardDataQuery query,
+            CancellationToken ct)
+    {
+        var accessResult =
+            await CheckDashboardAccess(
+                query.CustomerNo,
+                query.SiteId,
+                ct);
+
+        if (accessResult is not null)
+        {
+            return accessResult;
+        }
+
+        query.CustomerNo =
+            query.CustomerNo?
+                .Trim()
+                .ToUpperInvariant()
+            ?? "";
+
+        query.SiteId =
+            query.SiteId?
+                .Trim()
+                .ToUpperInvariant()
+            ?? "";
+
+        var result =
+            await _dashboardService
+                .GetSlaDashboardDataAsync(
+                    query,
+                    ct);
+
+        if (!result.Success)
+        {
+            return StatusCode(
+                result.StatusCode,
+                result.Error);
+        }
+
+        return Ok(result.Data);
+    }
+
+    // =========================================================
+    // SLA dashboard supporting calls
+    // =========================================================
+
+    [HttpGet("sla-dashboard/items")]
+    public async Task<ActionResult<PortalDashboardSlaItemsResponse>>
+        GetSlaDashboardItems(
+            [FromQuery] PortalDashboardSlaItemsQuery query,
+            CancellationToken ct)
+    {
+        var accessResult =
+            await CheckDashboardAccess(
+                query.CustomerNo,
+                query.SiteId,
+                ct);
+
+        if (accessResult is not null)
+        {
+            return accessResult;
+        }
+
+        query.CustomerNo =
+            query.CustomerNo?
+                .Trim()
+                .ToUpperInvariant()
+            ?? "";
+
+        query.SiteId =
+            query.SiteId?
+                .Trim()
+                .ToUpperInvariant()
+            ?? "";
+
+        var result =
+            await _dashboardService
+                .GetSlaDashboardItemsAsync(
+                    query,
+                    ct);
+
+        if (!result.Success)
+        {
+            return StatusCode(
+                result.StatusCode,
+                result.Error);
+        }
+
+        return Ok(result.Data);
     }
 
     // =========================================================

@@ -32,4 +32,18 @@ public interface IDashboardDataService
         GetMaintenanceDashboardItemsAsync(
             PortalDashboardMaintenanceItemsQuery query,
             CancellationToken ct = default);
+
+    // =========================================================
+    // SLA dashboard
+    // =========================================================
+
+    Task<ServiceResult<PortalSlaDashboardDataDto>>
+    GetSlaDashboardDataAsync(
+        PortalDashboardDataQuery query,
+        CancellationToken ct = default);
+
+    Task<ServiceResult<PortalDashboardSlaItemsResponse>>
+        GetSlaDashboardItemsAsync(
+            PortalDashboardSlaItemsQuery query,
+            CancellationToken ct = default);
 }

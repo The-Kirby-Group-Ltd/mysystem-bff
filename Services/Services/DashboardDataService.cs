@@ -8,13 +8,16 @@ public class DashboardDataService : IDashboardDataService
 {
     private readonly ICallsDashboardService _callsDashboardService;
     private readonly IMaintenanceDashboardService _maintenanceDashboardService;
+    private readonly ISlaDashboardService _slaDashboardService;
 
     public DashboardDataService(
         ICallsDashboardService callsDashboardService,
-        IMaintenanceDashboardService maintenanceDashboardService)
+        IMaintenanceDashboardService maintenanceDashboardService,
+        ISlaDashboardService slaDashboardService)
     {
         _callsDashboardService = callsDashboardService;
         _maintenanceDashboardService = maintenanceDashboardService;
+        _slaDashboardService = slaDashboardService;
     }
 
     // =========================================================
@@ -61,6 +64,30 @@ public class DashboardDataService : IDashboardDataService
             CancellationToken ct = default)
     {
         return _maintenanceDashboardService.GetDashboardItemsAsync(
+            query,
+            ct);
+    }
+
+    // =========================================================
+    // SLA dashboard
+    // =========================================================
+
+    public Task<ServiceResult<PortalSlaDashboardDataDto>>
+        GetSlaDashboardDataAsync(
+            PortalDashboardDataQuery query,
+            CancellationToken ct = default)
+    {
+        return _slaDashboardService.GetDashboardDataAsync(
+            query,
+            ct);
+    }
+
+    public Task<ServiceResult<PortalDashboardSlaItemsResponse>>
+        GetSlaDashboardItemsAsync(
+            PortalDashboardSlaItemsQuery query,
+            CancellationToken ct = default)
+    {
+        return _slaDashboardService.GetDashboardItemsAsync(
             query,
             ct);
     }

@@ -121,6 +121,11 @@ builder.Services.AddScoped<
     IMaintenanceDashboardService,
     MaintenanceDashboardService>();
 
+
+builder.Services.AddScoped<
+    ISlaDashboardService, 
+    SlaDashboardService>();
+
 builder.Services.AddScoped<
     IDashboardDataService,
     DashboardDataService>();
