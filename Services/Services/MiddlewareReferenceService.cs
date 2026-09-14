@@ -1,9 +1,11 @@
-﻿using System.Net.Http.Headers;
-using System.Net.Http.Json;
+﻿using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.N;
 using mysystem_bff.Models.Admin;
 using mysystem_bff.Models.Middleware;
 using mysystem_bff.Models.Portal;
 using mysystem_bff.Services.Interfaces;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Permissions;
 
 namespace mysystem_bff.Services.Services;
 
@@ -206,5 +208,107 @@ public class MiddlewareReferenceService : IMiddlewareReferenceService
             Telephone = engineer.Telephone ?? "",
             Email = engineer.EMail ?? ""
         };
+    }
+
+    // =========================================================
+    // Failed to respond reason
+    // =========================================================
+
+    public async Task<ServiceResult<PortalFailedToRespondReasonDto>>
+        GetFailedToRespondReason(
+            string code,
+            CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return ServiceResult<PortalFailedToRespondReasonDto>.Fail(
+                "Failed-to-respond reason code is required.",
+                400);
+        }
+
+        var cleanCode =
+            code.Trim().ToUpperInvariant();
+
+        var baseUrl =
+            _config["MiddlewareApi:BaseUrl"];
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return ServiceResult<PortalFailedToRespondReasonDto>.Fail(
+                "Middleware API configuration is missing.",
+                500);
+        }
+
+        var tokenResult =
+            await _authService.GetMiddlewareToken();
+
+        if (
+            !tokenResult.Success ||
+            string.IsNullOrWhiteSpace(tokenResult.Data)
+        )
+        {
+            return ServiceResult<PortalFailedToRespondReasonDto>.Fail(
+                tokenResult.Error ??
+                "Failed to authenticate with middleware API.",
+                tokenResult.StatusCode > 0
+                    ? tokenResult.StatusCode
+                    : 502);
+        }
+
+        var url =
+            $"{baseUrl.TrimEnd('/')}/api/reference/failed-to-respond-reasons/{Uri.EscapeDataString(cleanCode)}";
+
+        using var request =
+            new HttpRequestMessage(
+                HttpMethod.Get,
+                url);
+
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                tokenResult.Data);
+
+        using var response =
+            await _httpClient.SendAsync(
+                request,
+                ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return ServiceResult<PortalFailedToRespondReasonDto>.Fail(
+                "Failed-to-respond reason not found.",
+                404);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody =
+                await response.Content.ReadAsStringAsync(ct);
+
+            return ServiceResult<PortalFailedToRespondReasonDto>.Fail(
+                $"Middleware API request failed. Status={(int)response.StatusCode}. Body={errorBody}",
+                502);
+        }
+
+        var result =
+            await response.Content.ReadFromJsonAsync<MiddlewareFailedToRespondReason>(
+                cancellationToken: ct);
+
+        if (result is null)
+        {
+            return ServiceResult<PortalFailedToRespondReasonDto>.Fail(
+                "Middleware API returned an invalid failed-to-respond reason response.",
+                502);
+        }
+
+        var portalDto =
+            new PortalFailedToRespondReasonDto
+            {
+                Code = result.Code,
+                Description = result.Description
+            };
+
+        return ServiceResult<PortalFailedToRespondReasonDto>.Ok(
+            portalDto);
     }
 }

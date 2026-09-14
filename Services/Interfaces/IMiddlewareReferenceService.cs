@@ -12,4 +12,8 @@ public interface IMiddlewareReferenceService
     Task<ServiceResult<PortalPagedResponse<PortalEngineerDto>>> GetEngineers(
         PortalReferenceQuery query,
         CancellationToken ct = default);
+ 
+    Task<ServiceResult<PortalFailedToRespondReasonDto>> GetFailedToRespondReason(
+        string code,
+        CancellationToken ct = default);
 }

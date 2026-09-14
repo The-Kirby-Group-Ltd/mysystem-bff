@@ -17,4 +17,6 @@ public class MiddlewareCall
     public string? CompletedRemarks { get; set; }
     public DateTime? PreviousMaintenanceDate { get; set; }
     public DateTime? NextMaintenanceDate { get; set; }
+    public string? FailedToRespond_YN { get; set; }
+    public string? FailedToRespondReason { get; set; }
 }

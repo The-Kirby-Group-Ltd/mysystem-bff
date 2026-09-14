@@ -219,7 +219,9 @@ public class MiddlewareCallsService : IMiddlewareCallsService
             InvoiceNo = call.InvoiceNo,
             LoggedRemarks = call.LoggedRemarks,
             PreviousMaintenanceDate = call.PreviousMaintenanceDate,
-            NextMaintenanceDate = call.NextMaintenanceDate
+            NextMaintenanceDate = call.NextMaintenanceDate,
+            FailedToRespond_YN = call.FailedToRespond_YN,
+            FailedToRespondReason = call.FailedToRespondReason,
         };
     }
 }

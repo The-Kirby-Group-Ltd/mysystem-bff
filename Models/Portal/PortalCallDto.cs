@@ -16,4 +16,7 @@ public class PortalCallDto
     public string? LoggedRemarks { get; set; }
     public DateTime? PreviousMaintenanceDate { get; set; }
     public DateTime? NextMaintenanceDate { get; set; }
+    
+    public string? FailedToRespond_YN { get; set; }
+    public string? FailedToRespondReason { get; set; }
 }
