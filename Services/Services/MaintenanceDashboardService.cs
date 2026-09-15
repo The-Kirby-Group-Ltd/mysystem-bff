@@ -763,9 +763,15 @@ public class MaintenanceDashboardService
         DateTime? nextMaintenanceDate,
         DateTime today)
     {
+        /* 
+         * Items with no value are overdue, since 
+         * overdue systems are not returned by 
+         * '/future-maintenance-schedules in the api.
+         */
+
         if (!nextMaintenanceDate.HasValue)
         {
-            return "UNKNOWN";
+            return "OVERDUE";
         }
 
         var maintenanceDate =
@@ -776,6 +782,8 @@ public class MaintenanceDashboardService
 
         if (maintenanceDate < todayDate)
         {
+            // actually labelled as overdue
+            // not likely to return anything
             return "OVERDUE";
         }
 
@@ -802,9 +810,6 @@ public class MaintenanceDashboardService
             "OVERDUE" =>
                 "Overdue",
 
-            "UNKNOWN" =>
-                "No maintenance date",
-
             _ =>
                 statusCode
         };
@@ -819,16 +824,16 @@ public class MaintenanceDashboardService
         DashboardMaintenanceFilterType filterType,
         DateTime today)
     {
+        var todayDate = today.Date;
+
         if (!item.NextMaintenanceDate.HasValue)
         {
-            return false;
+            return filterType == 
+                DashboardMaintenanceFilterType.OVERDUE;
         }
 
-        var maintenanceDate =
+        var maintenanceDate = 
             item.NextMaintenanceDate.Value.Date;
-
-        var todayDate =
-            today.Date;
 
         return filterType switch
         {
@@ -848,15 +853,18 @@ public class MaintenanceDashboardService
                 maintenanceDate <= todayDate.AddDays(7),
 
             DashboardMaintenanceFilterType.DAYS_8_TO_14 =>
-                maintenanceDate > todayDate.AddDays(7) &&
+                maintenanceDate >
+                todayDate.AddDays(7) &&
                 maintenanceDate <= todayDate.AddDays(14),
 
             DashboardMaintenanceFilterType.DAYS_15_TO_30 =>
-                maintenanceDate > todayDate.AddDays(14) &&
+                maintenanceDate >
+                todayDate.AddDays(14) &&
                 maintenanceDate <= todayDate.AddDays(30),
 
             DashboardMaintenanceFilterType.DAYS_31_TO_90 =>
-                maintenanceDate > todayDate.AddDays(30) &&
+                maintenanceDate >
+                todayDate.AddDays(30) &&
                 maintenanceDate <= todayDate.AddDays(90),
 
             _ =>
