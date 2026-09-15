@@ -1,9 +1,22 @@
 using System.Text;
+
+// rate limiting 
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using mysystem_bff.Services.Helpers;
+
+// auth tokens
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+
 using MySqlConnector;
+
+// services
 using mysystem_bff.Services.Interfaces;
 using mysystem_bff.Services.Services;
+
+// serilog logging
 using Serilog;
 
 // ======================================================================
@@ -156,6 +169,131 @@ builder.Services.AddCors(options =>
 
 // ======================================================================
 
+// rate limiting
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    // global api protection
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context =>
+        {
+            var partitionKey = RateLimitHelpers.GetRateLimitPartitionKey(context);
+
+            return RateLimitPartition
+                .GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 180,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                    });
+        });
+
+    // login
+
+    options.AddPolicy(
+        "Login",
+        context =>
+        {
+            var partitionKey =
+                RateLimitHelpers.GetRateLimitPartitionKey(context);
+
+            return RateLimitPartition
+                .GetFixedWindowLimiter(
+                    partitionKey,
+                    _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 8,
+                            Window =
+                                TimeSpan.FromMinutes(5),
+
+                            QueueLimit = 0,
+
+                            AutoReplenishment = true
+                        });
+        });
+
+    // security operations / email codes
+
+    options.AddPolicy(
+        "Security",
+        context =>
+        {
+            var partitionKey =
+                RateLimitHelpers.GetRateLimitPartitionKey(context);
+
+            return RateLimitPartition
+                .GetFixedWindowLimiter(
+                    partitionKey,
+                    _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5,
+                            Window =
+                                TimeSpan.FromMinutes(10),
+
+                            QueueLimit = 0,
+
+                            AutoReplenishment = true
+                        });
+        });
+
+    // expensive dashboard operations
+
+    options.AddPolicy(
+        "ExpensiveDashboard",
+        context =>
+        {
+            var partitionKey =
+                RateLimitHelpers.GetRateLimitPartitionKey(context);
+
+            return RateLimitPartition
+                .GetConcurrencyLimiter(
+                    partitionKey,
+                    _ =>
+                        new ConcurrencyLimiterOptions
+                        {
+                            PermitLimit = 1,
+                            QueueLimit = 0,
+                            QueueProcessingOrder =
+                                QueueProcessingOrder
+                                    .OldestFirst
+                        });
+        });
+
+    // 429 rate limited response
+
+    options.OnRejected =
+        async (context, cancellationToken) =>
+        {
+            context.HttpContext
+                .Response.StatusCode =
+                StatusCodes.Status429TooManyRequests;
+
+            context.HttpContext
+                .Response.ContentType =
+                "application/json";
+
+            await context.HttpContext
+                .Response.WriteAsJsonAsync(
+                    new
+                    {
+                        message =
+                            "Too many requests. Please wait and try again."
+                    },
+                    cancellationToken);
+        };
+});
+
+// ======================================================================
+
 // build project
 
 try
@@ -166,6 +304,7 @@ try
     app.UseHttpsRedirection();
     app.UseCors("FrontendCors");
     app.UseAuthentication();
+    app.UseRateLimiter();
 
     // track user endpoint usage
     app.Use(async (context, next) => 

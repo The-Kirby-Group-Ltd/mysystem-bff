@@ -2,6 +2,7 @@
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using mysystem_bff.Models.Auth;
 using mysystem_bff.Services.Interfaces;
 using System.Security.Claims;
@@ -24,6 +25,7 @@ public class PortalChangePasswordController : ControllerBase
     // ========================================================
 
     [HttpPost]
+    [EnableRateLimiting("Security")]
     [Route("code")]
     public async Task<ActionResult> RequestPasswordChangeMFACode(
         CancellationToken ct)
@@ -52,6 +54,7 @@ public class PortalChangePasswordController : ControllerBase
     // ========================================================
 
     [HttpPost]
+    [EnableRateLimiting("Security")]
     public async Task<ActionResult> ChangeUserPassword(
         [FromBody] ChangePasswordRequest request,
         CancellationToken ct)

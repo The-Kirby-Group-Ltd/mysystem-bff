@@ -3,6 +3,7 @@
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
 using mysystem_bff.Models.Admin;
@@ -33,6 +34,7 @@ public class AuthController : ControllerBase
     // =======================================================
 
     [HttpPost("login")]
+    [EnableRateLimiting("Login")]
     [AllowAnonymous]
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request)
     {

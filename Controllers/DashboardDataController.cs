@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using mysystem_bff.Models.Portal.DashboardData;
 using mysystem_bff.Services.Interfaces;
-using mysystem_bff.Services.Services;
 
 namespace mysystem_bff.Controllers;
 
@@ -125,6 +125,7 @@ public class DashboardDataController : ControllerBase
     // =========================================================
 
     [HttpGet("maintenance-dashboard")]
+    [EnableRateLimiting("ExpensiveDashboard")]
     public async Task<ActionResult<PortalMaintenanceDashboardDataDto>>
         GetMaintenanceDashboardData(
             [FromQuery] PortalDashboardDataQuery query,
@@ -177,6 +178,7 @@ public class DashboardDataController : ControllerBase
     // =========================================================
 
     [HttpGet("maintenance-dashboard/items")]
+    [EnableRateLimiting("ExpensiveDashboard")]
     public async Task<ActionResult<PortalDashboardMaintenanceItemsResponse>>
     GetMaintenanceDashboardItems(
         [FromQuery] PortalDashboardMaintenanceItemsQuery query,

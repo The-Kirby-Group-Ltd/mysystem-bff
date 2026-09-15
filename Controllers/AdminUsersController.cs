@@ -1,11 +1,12 @@
 ﻿namespace mysystem_bff.Controllers;
 
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.RateLimiting;
 using mysystem_bff.Models.Admin;
 using mysystem_bff.Services.Interfaces;
+using System.Security.Claims;
 
 [ApiController]
 [Route("api/admin/users")]
@@ -134,6 +135,7 @@ public class AdminUsersController : ControllerBase
 
     // reset user password 
     [HttpPost("{userId}/reset-password")]
+    [EnableRateLimiting("Security")]
     public async Task<IActionResult> ResetPassword(
     string userId,
     ResetPasswordRequest request)
