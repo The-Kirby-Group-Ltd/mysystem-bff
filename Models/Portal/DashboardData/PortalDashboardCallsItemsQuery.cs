@@ -1,5 +1,7 @@
 ﻿namespace mysystem_bff.Models.Portal.DashboardData;
 
+using mysystem_bff.Models;
+
 public class PortalDashboardCallsItemsQuery
 {
     public string CustomerNo { get; set; } = "";

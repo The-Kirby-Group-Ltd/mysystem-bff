@@ -1,20 +1,27 @@
 using System.Text;
 
+// local service library
+using mysystem_bff.Services.Interfaces.Admin;
+using mysystem_bff.Services.Interfaces.Calendar;
+using mysystem_bff.Services.Interfaces.Dashboard;
+using mysystem_bff.Services.Interfaces.GenericData;
+using mysystem_bff.Services.Interfaces.Security;
+
+using mysystem_bff.Services.Services.Admin;
+using mysystem_bff.Services.Services.ApiUsage;
+using mysystem_bff.Services.Services.Calendar;
+using mysystem_bff.Services.Services.Dashboard;
+using mysystem_bff.Services.Services.GenericData;
+using mysystem_bff.Services.Services.Security;
+
 // rate limiting 
-using System.Security.Claims;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 using mysystem_bff.Services.Helpers;
+using System.Threading.RateLimiting;
 
 // auth tokens
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-
 using MySqlConnector;
-
-// services
-using mysystem_bff.Services.Interfaces;
-using mysystem_bff.Services.Services;
 
 // serilog logging
 using Serilog;
@@ -126,22 +133,14 @@ builder.Services.AddHttpClient<IMiddlewareCallActionsService, MiddlewareCallActi
 
 // frontend dashboard services
 
-builder.Services.AddScoped<
-    ICallsDashboardService,
-    CallsDashboardService>();
+builder.Services.AddScoped<ICallsDashboardService, CallsDashboardService>();
+builder.Services.AddScoped<IMaintenanceDashboardService, MaintenanceDashboardService>();
+builder.Services.AddScoped<ISlaDashboardService, SlaDashboardService>();
+builder.Services.AddScoped<IDashboardDataService, DashboardDataService>();
 
-builder.Services.AddScoped<
-    IMaintenanceDashboardService,
-    MaintenanceDashboardService>();
+// events calendar services
 
-
-builder.Services.AddScoped<
-    ISlaDashboardService, 
-    SlaDashboardService>();
-
-builder.Services.AddScoped<
-    IDashboardDataService,
-    DashboardDataService>();
+builder.Services.AddScoped<ICalendarMaintenanceService, CalendarMaintenanceService>();
 
 // mmapi authentication service
 
