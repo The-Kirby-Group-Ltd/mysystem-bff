@@ -140,6 +140,7 @@ builder.Services.AddScoped<IDashboardDataService, DashboardDataService>();
 
 // events calendar services
 
+builder.Services.AddScoped<ICalendarCallsService, CalendarCallsService>();
 builder.Services.AddScoped<ICalendarMaintenanceService, CalendarMaintenanceService>();
 
 // mmapi authentication service

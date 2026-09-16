@@ -1,12 +1,7 @@
 ﻿namespace mysystem_bff.Controllers.Calendar;
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Graph.Models;
-using Microsoft.Graph.Models.ExternalConnectors;
-using Microsoft.Identity.Client;
 using mysystem_bff.Models.Portal.EventsCalendar;
 using mysystem_bff.Services.Interfaces.Calendar;
 using mysystem_bff.Services.Interfaces.Security;
@@ -16,6 +11,11 @@ using mysystem_bff.Services.Interfaces.Security;
 [Authorize]
 public class EventsCalendarController : ControllerBase
 {
+
+    // =========================================================
+    // Construct
+    // =========================================================
+
     private readonly ICalendarCallsService _callsService;
     private readonly ICalendarMaintenanceService _maintenanceService;
     private readonly IPortalAccessService _accessService;
@@ -35,27 +35,47 @@ public class EventsCalendarController : ControllerBase
     // =========================================================
 
     [HttpGet("calls")]
-    public async Task<ActionResult<List<PortalCalendarCallEventDto>>> 
+    public async Task<ActionResult<List<PortalCalendarCallEventDto>>>
         GetCallEvents(
-            [FromQuery] PortalCalendarQuery query,
+            [FromQuery] PortalCalendarCallsQuery query,
             CancellationToken ct)
     {
-        var accessResult = await CheckAccess(
-            query.CustomerNo,
-            query.SiteId,
-            ct);
+        var customerNo =
+            query.CustomerNo?
+                .Trim()
+                .ToUpperInvariant()
+            ?? "";
 
-        if (accessResult is not null)
-            return accessResult;
+        if (string.IsNullOrWhiteSpace(customerNo))
+        {
+            return BadRequest(
+                "Customer No is required.");
+        }
 
-        var result = await _callsService.GetEventsAsync(
-            query,
-            ct);
+        var canAccess =
+            await _accessService.CanAccessCustomer(
+                User,
+                customerNo);
+
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        query.CustomerNo =
+            customerNo;
+
+        var result =
+            await _callsService.GetEventsAsync(
+                query,
+                ct);
 
         if (!result.Success)
+        {
             return StatusCode(
                 result.StatusCode,
                 result.Error);
+        }
 
         return Ok(result.Data);
     }
